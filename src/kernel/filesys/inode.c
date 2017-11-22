@@ -38,7 +38,7 @@ void init_inode_table(struct ssu_fs *fs) {
 
         //make root directory
         rootInode = inode_create(fs, SSU_TYPE_DIR);
-        memcpy(&inode_tbl[2], rootInode, sizeof(struct inode));
+        //memcpy(&inode_tbl[2], rootInode, sizeof(struct inode));
         //root = inode_create(fs, SSU_TYPE_DIR);
         //cur_process->rootdir = root;
 
@@ -55,6 +55,7 @@ void init_inode_table(struct ssu_fs *fs) {
 
     memcpy(&dataBlock[0], &cur_dir__, sizeof(struct direntry));
     memcpy(&dataBlock[1], &parent_dir, sizeof(struct direntry));
+
 
     fs_writeblock(fs, 8, (const char *) dataBlock);//data 블록에 쓰기
 
@@ -75,32 +76,34 @@ struct inode *inode_create(struct ssu_fs *fs, uint16_t type) {
     for (i = 0; i < NUM_INODE; i++) {
         if (!bitmap_test(inodemap, i)) {
             new_inode->sn_ino = i;
-            new_inode->sn_size = 0;
+            new_inode->sn_size = 128;
             new_inode->sn_type = type;
             new_inode->sn_nlink = 1;
             new_inode->sn_directblock[0] = i + 6;
             new_inode->sn_refcount = 0;
             new_inode->sn_fs = fs;
+            memcpy(&inode_tbl[i], new_inode, sizeof(struct inode));
+
             bitmap_set(inodemap, i, true);
             bitmap_set(bitmap, i + 6, true);
             break;
         }
     }
     //sync_inode(fs, new_inode);
-    view_bitmap(inodemap);
-    view_bitmap(bitmap);
+//    view_bitmap(inodemap);
+//    view_bitmap(bitmap);
     return new_inode;
 }
 
 int inode_write(struct inode *in, uint32_t offset, char *buf, int len) {
-//buf 를 len만큼 in으로 찾은 data_block 에다가 offset 부터 len만큼 쓴다
+//buf 를 len만큼 in으로 찾은 data_block 에다가 offset 부터 len만큼 쓴다 len == 64
     int result = 0;
     struct ssu_fs *fs = in->sn_fs;
 
     fs_readblock(fs,in->sn_directblock[0],tmpblock);
     struct direntry * data = (struct direntry *) tmpblock;
     memcpy(&data[offset],(struct direntry *)buf,len);
-
+    in->sn_size+=len;
     /* Add Your Code */
     fs_writeblock(fs, in->sn_directblock[0], (char *) data);
 
@@ -134,8 +137,10 @@ int make_dir(struct inode *cwd, char *name) {
     struct bitmap *b = fs->fs_blkmap;
     int newBlockIndex;
     balloc(b, &newBlockIndex);//newBlockIndex에는 새로운 datablock index
+
+
     printk("newBlockIndex : %d\n", newBlockIndex);
-    fs_readblock(fs, cwd->sn_directblock[0], tmpblock);
+
     printk("currentBlockIndex : %d\n", cwd->sn_directblock[0]);
 
     struct inode *new_inode = inode_create(fs, SSU_TYPE_DIR);//새로운 디렉토리 datablock의 inode
@@ -144,26 +149,20 @@ int make_dir(struct inode *cwd, char *name) {
     new_dir.de_ino = new_inode->sn_ino;
     memcpy(&new_dir.de_name, name, FILENAME_LEN);
 
-    struct direntry cur_dir/* = {cwd->sn_ino, ".."}*/;
-    cur_dir.de_ino = cwd->sn_ino;
-    memcpy(&cur_dir.de_name, name, FILENAME_LEN);
-    printk("cur_dir ino : %d new_dir ino : %d\n", cwd->sn_ino, new_inode->sn_ino);
 
     struct direntry *dataBlock = (struct direntry *) tmpblock;
-    memcpy(&dataBlock[2+cwd->sn_size++], &new_dir, sizeof(struct direntry));
-    fs_writeblock(fs, cwd->sn_directblock[0], (const char *) dataBlock);//data 블록에 쓰기
 
-    memset(dataBlock, 0, sizeof(SSU_BLOCK_SIZE));
+    inode_write(cwd,num_direntry(cwd),(char*)&new_dir,sizeof(struct direntry));
 
 
     struct direntry cur_dir__ = {new_inode->sn_ino, "."};
     struct direntry parent_dir = {cwd->sn_ino, ".."};
 
-    memcpy(&dataBlock[0], &cur_dir, sizeof(struct direntry));
+    memcpy(&dataBlock[0], &cur_dir__, sizeof(struct direntry));
     memcpy(&dataBlock[1], &parent_dir, sizeof(struct direntry));
 
-    fs_writeblock(fs, newBlockIndex, (const char *) dataBlock);//data 블록에 쓰기
-
+    inode_write(new_inode,num_direntry(new_inode),(char*)&cur_dir__,sizeof(struct direntry));
+    inode_write(new_inode,num_direntry(new_inode),(char*)&parent_dir,sizeof(struct direntry));
 
     return 0;
 }
@@ -179,15 +178,26 @@ static int num_direntry(struct inode *in) {
 void list_segment(struct inode *cwd) {
     /* Add Your Code */
     struct ssu_fs *fs = cwd->sn_fs;
-    printk("curdir ino : %d\n", cwd->sn_ino);
-    printk("curdir directory count : %d\n", cwd->sn_size);
-    printk("directory count : %d\n", cwd->sn_size);
+    //printk("curdir ino : %d\n", cwd->sn_ino);
+    //printk("curdir directory count : %d\n", cwd->sn_size);
+    //printk("directory count : %d\n", cwd->sn_size);
     fs_readblock(fs, cwd->sn_directblock[0], tmpblock);
     struct direntry *dataBlock = (struct direntry *) tmpblock;
+    struct inode * inode;
+    printk("name | size | type | blocks | ino\n");
+    for (int i = 0; i < num_direntry(cwd); i++) {
+        inode = &inode_tbl[dataBlock[i].de_ino];
+        switch(inode->sn_type)
+        {
+            case 2:
+                printk("%s | %d | d | %d | %d\n", dataBlock[i].de_name,inode->sn_size,inode->sn_nlink,dataBlock[i].de_ino);
+                break;
+            case 1:
+                printk("%s | %d | f | %d | %d\n", dataBlock[i].de_name,inode->sn_size,inode->sn_nlink,dataBlock[i].de_ino);
+                break;
+        }
 
-    for (int i = 0; i < cwd->sn_size+2; i++) {
-        printk("ino : %d\n", dataBlock[i].de_ino);
-        printk("%s\n", dataBlock[i].de_name);
+
     }
 }
 

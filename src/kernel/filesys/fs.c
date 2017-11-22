@@ -103,7 +103,6 @@ int fs_readblock(struct ssu_fs *fs, uint32_t blknum, char *buf) {
 	int result = 0;
 	int i;
 
-    printk("fs_readblock\n");
 	/* Modify and Add Your Code */
 	int startsec = blknum*8;
 	for (i = 0; i < 8; i++)

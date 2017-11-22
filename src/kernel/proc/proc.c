@@ -369,9 +369,9 @@ void shell_proc(void* aux)
 
 		/* cwd 출력*/
 		if(cur_process->cwd == cur_process->rootdir)
-			printk("rootdir\n");
+			printk("");
 		else
-			printk("not rootdir\n");
+			printk("");
 
 		printk("> ");
 
