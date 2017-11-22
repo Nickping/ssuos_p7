@@ -1,0 +1,3 @@
+CMakeLists.txt not found in C:\Users\admin\Desktop\os_5\ssuos_p7
+Cygwin not found at: C:\cygwin64
+CMake executable not found
