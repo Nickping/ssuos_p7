@@ -188,6 +188,8 @@ main_init:
 	pushl	$.LC4
 	call	printk
 	addl	$16, %esp
+	.loc 1 75 0
+	call	init_filesystem
 	.loc 1 77 0
 	subl	$12, %esp
 	pushl	$.LC13

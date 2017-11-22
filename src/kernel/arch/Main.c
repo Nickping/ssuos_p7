@@ -72,7 +72,7 @@ void main_init(void)
 	init_ata();
 	printk("%s", "ATA device Intialization\n");
 
-//	init_filesystem();
+	init_filesystem();
 
 	printk("========== initialization complete ==========\n\n");
 
